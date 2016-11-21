@@ -11,16 +11,18 @@ Get the sections for a given page. This makes parsing for quotes more manageable
 
 #### getQuotesForSection(pageId, sectionIndex, success, error)
 Get all quotes for a given section.  Most sections will be of the format:
-    `<h3> title </h3>
+```html
+<h3> title </h3>
+<ul>
+  <li>
+    Quote text
     <ul>
-      <li> 
-        Quote text
-        <ul>
-          <li> additional info on the quote </li>
-        </ul>
-      </li>
-    <ul>
-    <ul> next quote etc... </ul>`
+      <li> additional info on the quote </li>
+    </ul>
+  </li>
+<ul>
+<ul> next quote etc... </ul>
+```
 
 The quote may or may not contain sections inside `<b />` tags.
 
