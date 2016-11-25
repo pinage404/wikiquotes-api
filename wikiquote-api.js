@@ -1,4 +1,4 @@
-const WikiquoteApi = (() => {
+const WikiquoteApi = (($) => {
   const API_URL = 'https://en.wikiquote.org/w/api.php';
 
   return {
@@ -32,9 +32,7 @@ const WikiquoteApi = (() => {
         } else {
           error('No results');
         }
-      }).fail(() => {
-        error('Error processing your query');
-      });
+      }).fail(() => error('Error processing your query'));
     },
 
     /**
@@ -45,7 +43,7 @@ const WikiquoteApi = (() => {
      * in case there is a redirect.
      */
     getSectionsForPage: (pageId, success, error) => {
-      $.ajax(API_URL, {
+      $.getJSON(API_URL, {
         format: 'json',
         action: 'parse',
         prop: 'sections',
@@ -66,9 +64,7 @@ const WikiquoteApi = (() => {
           sectionArray.push('1');
         }
         success({ titles: result.parse.title, sections: sectionArray });
-      }).fail(() => {
-        error('Error getting sections');
-      });
+      }).fail(() => error('Error getting sections'));
     },
 
     /**
@@ -92,7 +88,7 @@ const WikiquoteApi = (() => {
      * in case there is a redirect.
      */
     getQuotesForSection: (pageId, sectionIndex, success, error) => {
-      $.ajax(API_URL, {
+      $.getJSON(API_URL, {
         format: 'json',
         action: 'parse',
         noimages: '',
@@ -116,10 +112,9 @@ const WikiquoteApi = (() => {
             quoteArray.push($(el).html());
           }
         });
+
         success({ titles: result.parse.title, quotes: quoteArray });
-      }).fail(() => {
-        error('Error getting quotes');
-      });
+      }).fail(() => error('Error getting quotes'));
     },
 
     /**
@@ -127,7 +122,7 @@ const WikiquoteApi = (() => {
      * Usually section 0 includes personal Wikipedia page link
      */
     getWikiForSection: (title, pageId, sec, success, error) => {
-      $.ajax(API_URL, {
+      $.getJSON(API_URL, {
         format: 'json',
         action: 'parse',
         noimages: '',
@@ -143,27 +138,24 @@ const WikiquoteApi = (() => {
             wikilink = obj.url;
           }
         });
+
         success(wikilink);
-      }).fail(() => {
-        error('Error getting quotes');
-      });
+      }).fail(() => error('Error getting quotes'));
     },
 
     /**
      * Search using opensearch api.  Returns an array of search results.
      */
     openSearch: (titles, success, error) => {
-      $.ajax(API_URL, {
+      $.getJSON(API_URL, {
         format: 'json',
         action: 'opensearch',
         namespace: 0,
         suggest: '',
         search: titles,
-      }).done(result => {
-        success(result[1]);
-      }).fail(() => {
-        error('Error with opensearch for ' + titles);
-      });
+      })
+      .done(result => success(result[1]))
+      .fail(() => error('Error with opensearch for ' + titles));
     },
 
     /**
@@ -181,13 +173,15 @@ const WikiquoteApi = (() => {
 
       function getQuotes(pageId, sections) {
         const randomNum = Math.floor(Math.random() * sections.sections.length);
-        this.getQuotesForSection(pageId, sections.sections[randomNum], chooseQuote, error);
+        this.getQuotesForSection(
+          pageId, sections.sections[randomNum], chooseQuote, error
+        );
       }
 
       function getSections(pageId) {
-        this.getSectionsForPage(pageId, sections => {
-          getQuotes(pageId, sections);
-        }, error);
+        this.getSectionsForPage(
+          pageId, sections => getQuotes(pageId, sections), error
+        );
       }
 
       this.queryTitles(titles, getSections, error);
@@ -205,4 +199,4 @@ const WikiquoteApi = (() => {
       return output.join(' ');
     },
   };
-})();
+})(jQuery);
