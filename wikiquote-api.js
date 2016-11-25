@@ -1,245 +1,208 @@
-const WikiquoteApi = (function() {
-
+const WikiquoteApi = (() => {
   const API_URL = 'https://en.wikiquote.org/w/api.php';
-  let wqa = {};
 
-  /**
-   * Query based on "titles" parameter and return page id.
-   * If multiple page ids are returned, choose the first one.
-   * Query includes "redirects" option to automatically traverse redirects.
-   * All words will be capitalized as this generally yields more consistent results.
-   */
-  wqa.queryTitles = function(titles, success, error) {
-    $.ajax({
-      url: API_URL,
-      dataType: 'jsonp',
-      data: {
+  return {
+    /**
+     * Query based on "titles" parameter and return page id.
+     * If multiple page ids are returned, choose the first one.
+     * Query includes "redirects" option to automatically traverse redirects.
+     * All words will be capitalized as this generally yields more consistent results.
+     */
+    queryTitles: (titles, success, error) => {
+      $.getJSON(API_URL, {
         format: 'json',
         action: 'query',
         redirects: '',
         titles: titles,
-      },
-
-      success: function(result, status) {
+      }).done(result => {
         const pages = result.query.pages;
         let pageId = -1;
-        for (let p in pages) {
-          let page = pages[p];
+
+        $.each(pages, (k, v) => {
+          let page = v;
           // api can return invalid recrods, these are marked as "missing"
           if (!('missing' in page)) {
             pageId = page.pageid;
-            break;
+            return false;
           }
-        }
+        });
+
         if (pageId > 0) {
           success(pageId);
         } else {
           error('No results');
         }
-      },
-
-      error: function(xhr, result, status) {
+      }).fail(() => {
         error('Error processing your query');
-      },
-    });
-  };
+      });
+    },
 
-  /**
-   * Get the sections for a given page.
-   * This makes parsing for quotes more manageable.
-   * Returns an array of all "1.x" sections as these usually contain the quotes.
-   * If no 1.x sections exists, returns section 1. Returns the titles that were used
-   * in case there is a redirect.
-   */
-  wqa.getSectionsForPage = function(pageId, success, error) {
-    $.ajax({
-      url: API_URL,
-      dataType: 'jsonp',
-      data: {
+    /**
+     * Get the sections for a given page.
+     * This makes parsing for quotes more manageable.
+     * Returns an array of all "1.x" sections as these usually contain the quotes.
+     * If no 1.x sections exists, returns section 1. Returns the titles that were used
+     * in case there is a redirect.
+     */
+    getSectionsForPage: (pageId, success, error) => {
+      $.ajax(API_URL, {
         format: 'json',
         action: 'parse',
         prop: 'sections',
         pageid: pageId,
-      },
-
-      success: function(result, status) {
+      }).done(result => {
         let sectionArray = [];
         const sections = result.parse.sections;
-        for (const s in sections) {
-          const splitNum = sections[s].number.split('.');
-          if (splitNum.length > 1 && splitNum[0] === "1") {
-            sectionArray.push(sections[s].index);
+
+        $.each(sections, (k, v) => {
+          const splitNum = v.number.split('.');
+          if (splitNum.length > 1 && splitNum[0] === '1') {
+            sectionArray.push(v.index);
           }
-        }
+        });
+
         // Use section 1 if there are no "1.x" sections
         if (sectionArray.length === 0) {
           sectionArray.push('1');
         }
         success({ titles: result.parse.title, sections: sectionArray });
-      },
-      error: function(xhr, result, status) {
+      }).fail(() => {
         error('Error getting sections');
-      },
-    });
-  };
+      });
+    },
 
-  /**
-   * Get all quotes for a given section.  Most sections will be of the format:
-   * <h3> title </h3>
-   * <ul>
-   *   <li>
-   *     Quote text
-   *     <ul>
-   *       <li> additional info on the quote </li>
-   *     </ul>
-   *   </li>
-   * <ul>
-   * <ul> next quote etc... </ul>
-   *
-   * The quote may or may not contain sections inside <b /> tags.
-   *
-   * For quotes with bold sections, only the bold part is returned for brevity
-   * (usually the bold part is more well known).
-   * Otherwise the entire text is returned.  Returns the titles that were used
-   * in case there is a redirect.
-   */
-  wqa.getQuotesForSection = function(pageId, sectionIndex, success, error) {
-    $.ajax({
-      url: API_URL,
-      dataType: 'jsonp',
-      data: {
+    /**
+     * Get all quotes for a given section.  Most sections will be of the format:
+     * <h3> title </h3>
+     * <ul>
+     *   <li>
+     *     Quote text
+     *     <ul>
+     *       <li> additional info on the quote </li>
+     *     </ul>
+     *   </li>
+     * <ul>
+     * <ul> next quote etc... </ul>
+     *
+     * The quote may or may not contain sections inside <b /> tags.
+     *
+     * For quotes with bold sections, only the bold part is returned for brevity
+     * (usually the bold part is more well known).
+     * Otherwise the entire text is returned.  Returns the titles that were used
+     * in case there is a redirect.
+     */
+    getQuotesForSection: (pageId, sectionIndex, success, error) => {
+      $.ajax(API_URL, {
         format: 'json',
         action: 'parse',
         noimages: '',
         pageid: pageId,
         section: sectionIndex,
-      },
-
-      success: function(result, status) {
+      }).done(result => {
         const quotes = result.parse.text['*'];
-        let quoteArray = []
+        let quoteArray = [];
 
         // Find top level <li> only
         const lis = $(quotes).find('li:not(li li)');
-        lis.each(function() {
+        lis.each((i, el) => {
           // Remove all children that aren't <b>
-          $(this).children().remove(':not(b)');
-          const bolds = $(this).find('b');
+          $(el).children().remove(':not(b)');
+          const bolds = $(el).find('b');
 
           // If the section has bold text, use it.  Otherwise pull the plain text.
           if (bolds.length > 0) {
             quoteArray.push(bolds.html());
           } else {
-            quoteArray.push($(this).html());
+            quoteArray.push($(el).html());
           }
         });
         success({ titles: result.parse.title, quotes: quoteArray });
-      },
-      error: function(xhr, result, status) {
+      }).fail(() => {
         error('Error getting quotes');
-      },
-    });
-  };
+      });
+    },
 
-  /**
-   * Get Wikipedia page for specific section
-   * Usually section 0 includes personal Wikipedia page link
-   */
-  wqa.getWikiForSection = function(title, pageId, sec, success, error) {
-    $.ajax({
-      url: API_URL,
-      dataType: 'jsonp',
-      data: {
+    /**
+     * Get Wikipedia page for specific section
+     * Usually section 0 includes personal Wikipedia page link
+     */
+    getWikiForSection: (title, pageId, sec, success, error) => {
+      $.ajax(API_URL, {
         format: 'json',
         action: 'parse',
         noimages: '',
         pageid: pageId,
         section: sec,
-      },
-
-      success: function(result, status) {
+      }).done(result => {
         let wikilink;
         const iwl = result.parse.iwlinks;
-        for (let i = 0; i < iwl.length; i++) {
-          const obj = iwl[i];
+
+        $.each(iwl, (i, v) => {
+          const obj = v;
           if ((obj['*']).indexOf(title) !== -1) {
             wikilink = obj.url;
           }
-        }
+        });
         success(wikilink);
-      },
-      error: function(xhr, result, status) {
+      }).fail(() => {
         error('Error getting quotes');
-      },
-    });
-  };
-  /**
-   * Search using opensearch api.  Returns an array of search results.
-   */
-  wqa.openSearch = function(titles, success, error) {
-    $.ajax({
-      url: API_URL,
-      dataType: 'jsonp',
-      data: {
+      });
+    },
+
+    /**
+     * Search using opensearch api.  Returns an array of search results.
+     */
+    openSearch: (titles, success, error) => {
+      $.ajax(API_URL, {
         format: 'json',
         action: 'opensearch',
         namespace: 0,
         suggest: '',
         search: titles,
-      },
-
-      success: function(result, status) {
+      }).done(result => {
         success(result[1]);
-      },
-      error: function(xhr, result, status) {
+      }).fail(() => {
         error('Error with opensearch for ' + titles);
-      },
-    });
+      });
+    },
+
+    /**
+     * Get a random quote for the given title search.
+     * This function searches for a page id for the given title, chooses a random
+     * section from the list of sections for the page, and then chooses a random
+     * quote from that section.  Returns the titles that were used in case there
+     * is a redirect.
+     */
+    getRandomQuote: (titles, success, error) => {
+      function chooseQuote(quotes) {
+        const randomNum = Math.floor(Math.random() * quotes.quotes.length);
+        success({ titles: quotes.titles, quote: quotes.quotes[randomNum] });
+      }
+
+      function getQuotes(pageId, sections) {
+        const randomNum = Math.floor(Math.random() * sections.sections.length);
+        this.getQuotesForSection(pageId, sections.sections[randomNum], chooseQuote, error);
+      }
+
+      function getSections(pageId) {
+        this.getSectionsForPage(pageId, sections => {
+          getQuotes(pageId, sections);
+        }, error);
+      }
+
+      this.queryTitles(titles, getSections, error);
+    },
+
+    /**
+     * Capitalize the first letter of each word
+     */
+    capitalizeString: input => {
+      const inputArray = input.split(' ');
+      let output = [];
+      $.each(inputArray, (k, v) => {
+        output.push(v.charAt(0).toUpperCase() + v.slice(1));
+      });
+      return output.join(' ');
+    },
   };
-
-  /**
-   * Get a random quote for the given title search.
-   * This function searches for a page id for the given title, chooses a random
-   * section from the list of sections for the page, and then chooses a random
-   * quote from that section.  Returns the titles that were used in case there
-   * is a redirect.
-   */
-  wqa.getRandomQuote = function(titles, success, error) {
-
-    function errorFunction(msg) {
-      error(msg);
-    }
-
-    function chooseQuote(quotes) {
-      const randomNum = Math.floor(Math.random() * quotes.quotes.length);
-      success({ titles: quotes.titles, quote: quotes.quotes[randomNum] });
-    }
-
-    function getQuotes(pageId, sections) {
-      const randomNum = Math.floor(Math.random() * sections.sections.length);
-      wqa.getQuotesForSection(pageId, sections.sections[randomNum], chooseQuote, errorFunction);
-    }
-
-    function getSections(pageId) {
-      wqa.getSectionsForPage(pageId, function(sections) {
-        getQuotes(pageId, sections);
-      }, errorFunction);
-    }
-
-    wqa.queryTitles(titles, getSections, errorFunction);
-  };
-
-  /**
-   * Capitalize the first letter of each word
-   */
-  wqa.capitalizeString = function(input) {
-    const inputArray = input.split(' ');
-    let output = [];
-    for (const s in inputArray) {
-      output.push(inputArray[s].charAt(0).toUpperCase() + inputArray[s].slice(1));
-    }
-    return output.join(' ');
-  };
-
-  return wqa;
-}());
+})();
