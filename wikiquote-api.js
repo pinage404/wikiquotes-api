@@ -161,20 +161,24 @@ const WikiquoteApi = (($) => {
    * is a redirect.
    */
   wqa.getRandomQuote = (titles, success, error) => {
+    function getRandomItem(array) {
+      return array[Math.floor(Math.random() * array.length)];
+    }
+
     function chooseQuote(quotes) {
-      const randomQuote = Math.floor(Math.random() * quotes.quotes.length);
-      success({ titles: quotes.titles, quote: quotes.quotes[randomQuote] });
+      const randomQuote = getRandomItem(quotes.quotes);
+      success({ titles: quotes.titles, quote: randomQuote });
     }
 
     function getQuotes(pageId, sections) {
-      const randomSection = Math.floor(Math.random() * sections.sections.length);
+      const randomSection = getRandomItem(sections.sections);
       wqa.getQuotesForSection(
-        pageId, sections.sections[randomSection], chooseQuote, error
+        pageId, randomSection, chooseQuote, error
       );
     }
 
     function getSections(pageIds) {
-      const randomPageId = Math.floor(Math.random() * pageIds.length);
+      const randomPageId = getRandomItem(pageIds);
       wqa.getSectionsForPage(
         randomPageId, sections => getQuotes(randomPageId, sections), error
       );
