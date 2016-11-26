@@ -1,6 +1,6 @@
 const WikiquoteApi = (($) => {
   const API_URL = 'https://en.wikiquote.org/w/api.php?callback=?';
-  const wqa = {};
+  let wqa = {};
 
   /**
    * Query based on "titles" parameter and return page id.
@@ -16,19 +16,17 @@ const WikiquoteApi = (($) => {
       titles: titles,
     }).done(result => {
       const pages = result.query.pages;
-      let pageId = -1;
+      let pageIdArray = [];
 
-      $.each(pages, (k, v) => {
-        let page = v;
+      $.each(pages, (k, page) => {
         // api can return invalid recrods, these are marked as "missing"
         if (!('missing' in page)) {
-          pageId = page.pageid;
-          return false;
+          pageIdArray.push(page.pageid);
         }
       });
 
-      if (pageId > 0) {
-        success(pageId);
+      if (pageIdArray.length > 0) {
+        success(pageIdArray);
       } else {
         error('No results');
       }
@@ -49,13 +47,13 @@ const WikiquoteApi = (($) => {
       prop: 'sections',
       pageid: pageId,
     }).done(result => {
-      let sectionArray = [];
       const sections = result.parse.sections;
+      let sectionArray = [];
 
-      $.each(sections, (k, v) => {
-        const splitNum = v.number.split('.');
+      $.each(sections, (k, section) => {
+        const splitNum = section.number.split('.');
         if (splitNum.length > 1 && splitNum[0] === '1') {
-          sectionArray.push(v.index);
+          sectionArray.push(section.index);
         }
       });
 
@@ -129,11 +127,10 @@ const WikiquoteApi = (($) => {
       pageid: pageId,
       section: sec,
     }).done(result => {
-      let wikilink;
       const iwl = result.parse.iwlinks;
+      let wikilink;
 
-      $.each(iwl, (i, v) => {
-        const obj = v;
+      $.each(iwl, (i, obj) => {
         if ((obj['*']).indexOf(title) !== -1) {
           wikilink = obj.url;
         }
@@ -153,9 +150,7 @@ const WikiquoteApi = (($) => {
       namespace: 0,
       suggest: '',
       search: titles,
-    })
-    .done(result => success(result[1]))
-    .fail(() => error('Error with opensearch for ' + titles));
+    }).done(result => success(result[1])).fail(() => error('Error with opensearch for ' + titles));
   };
 
   /**
@@ -167,20 +162,21 @@ const WikiquoteApi = (($) => {
    */
   wqa.getRandomQuote = (titles, success, error) => {
     function chooseQuote(quotes) {
-      const randomNum = Math.floor(Math.random() * quotes.quotes.length);
-      success({ titles: quotes.titles, quote: quotes.quotes[randomNum] });
+      const randomQuote = Math.floor(Math.random() * quotes.quotes.length);
+      success({ titles: quotes.titles, quote: quotes.quotes[randomQuote] });
     }
 
     function getQuotes(pageId, sections) {
-      const randomNum = Math.floor(Math.random() * sections.sections.length);
+      const randomSection = Math.floor(Math.random() * sections.sections.length);
       wqa.getQuotesForSection(
-        pageId, sections.sections[randomNum], chooseQuote, error
+        pageId, sections.sections[randomSection], chooseQuote, error
       );
     }
 
-    function getSections(pageId) {
+    function getSections(pageIds) {
+      const randomPageId = Math.floor(Math.random() * pageIds.length);
       wqa.getSectionsForPage(
-        pageId, sections => getQuotes(pageId, sections), error
+        randomPageId, sections => getQuotes(randomPageId, sections), error
       );
     }
 
@@ -193,9 +189,11 @@ const WikiquoteApi = (($) => {
   wqa.capitalizeString = input => {
     const inputArray = input.split(' ');
     let output = [];
-    $.each(inputArray, (k, v) => {
-      output.push(v.charAt(0).toUpperCase() + v.slice(1));
+
+    $.each(inputArray, (k, word) => {
+      output.push(word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
     });
+
     return output.join(' ');
   };
 
